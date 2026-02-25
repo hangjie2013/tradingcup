@@ -72,7 +72,7 @@ export function CupLobby() {
               <p>現在該当するカップはありません。</p>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((cup) => (
                 <CupCard key={cup.id} cup={cup} />
               ))}

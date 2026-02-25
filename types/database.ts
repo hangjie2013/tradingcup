@@ -1,4 +1,9 @@
 export type CupStatus = 'draft' | 'scheduled' | 'active' | 'ended' | 'finalized'
+
+export interface RewardTier {
+  rank: string   // e.g. "1位", "2〜3位", "参加賞"
+  reward: string // e.g. "10,000 IZKY"
+}
 export type Exchange = 'lbank'
 export type DisqualifyReason = 'deposit_detected' | 'withdrawal_detected' | 'admin_forced'
 
@@ -29,6 +34,8 @@ export interface Cup {
   end_at: string | null
   min_volume_usdt: number
   description: string | null
+  cover_image_url: string | null
+  rewards: RewardTier[]
   created_by: string | null
   created_at: string
 }

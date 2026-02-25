@@ -1,91 +1,140 @@
 'use client'
 
 import { Cup } from '@/types'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { formatDistanceToNow, format } from 'date-fns'
+import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Users, Clock, TrendingUp } from 'lucide-react'
+import { Users, Trophy, Gift, CalendarRange, Coins } from 'lucide-react'
 import Link from 'next/link'
 
 interface CupCardProps {
   cup: Cup & { participant_count?: number }
 }
 
-const statusConfig: Record<string, string> = {
-  draft: 'Draft',
-  scheduled: '予定',
-  active: 'ライブ',
-  ended: '終了',
-  finalized: '確定',
-}
-
 export function CupCard({ cup }: CupCardProps) {
-  const statusLabel = statusConfig[cup.status] ?? cup.status
+  const isActive    = cup.status === 'active'
+  const isScheduled = cup.status === 'scheduled'
+  const isEnded     = cup.status === 'ended' || cup.status === 'finalized'
+
+  const formatDate = (d: string | null) =>
+    d ? format(new Date(d), 'yyyy.MM.dd', { locale: ja }) : '—'
+
+  const rewardSummary = cup.rewards?.length
+    ? cup.rewards.slice(0, 2).map((r) => `${r.rank}: ${r.reward}`).join(' / ')
+      + (cup.rewards.length > 2 ? ' …' : '')
+    : null
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-[0px_8px_24px_0px_rgba(17,23,61,0.8)] overflow-hidden">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-4">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold text-foreground leading-tight">{cup.name}</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {cup.exchange.toUpperCase()} · {cup.pair}
-            </p>
+    <div className="flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-[0px_8px_24px_0px_rgba(17,23,61,0.8)] transition-transform hover:-translate-y-0.5">
+
+      {/* Live accent line */}
+      {isActive && (
+        <div className="h-0.5 w-full bg-gradient-to-r from-green-400 via-emerald-300 to-green-400 shrink-0" />
+      )}
+
+      {/* Cover image */}
+      <div className="relative aspect-video overflow-hidden bg-[#1d2766]">
+        {cup.cover_image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cup.cover_image_url}
+            alt={cup.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Trophy className="h-14 w-14 text-primary/20" />
           </div>
-          {cup.status === 'active' ? (
-            <span className="shrink-0 inline-flex items-center rounded-md bg-[#32bd50] px-2.5 py-0.5 text-xs font-medium text-white">
+        )}
+
+        {/* Status badge overlay */}
+        <div className="absolute top-2.5 right-2.5">
+          {isActive ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-green-500/20 backdrop-blur-sm border border-green-500/40 px-2 py-1 text-xs font-medium text-green-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
               ライブ
             </span>
+          ) : isScheduled ? (
+            <span className="inline-flex items-center rounded-md bg-blue-500/20 backdrop-blur-sm border border-blue-500/40 px-2 py-1 text-xs font-medium text-blue-400">
+              受付中
+            </span>
           ) : (
-            <Badge variant="secondary" className="shrink-0">
-              {statusLabel}
-            </Badge>
+            <span className="inline-flex items-center rounded-md bg-black/40 backdrop-blur-sm border border-white/10 px-2 py-1 text-xs font-medium text-muted-foreground">
+              {cup.status === 'finalized' ? '確定' : '終了'}
+            </span>
           )}
         </div>
-      </div>
 
-      {/* Body */}
-      <div className="px-6 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4 shrink-0" />
-            <span className="text-sm">
-              {cup.status === 'active' && cup.end_at
-                ? formatDistanceToNow(new Date(cup.end_at), { locale: ja, addSuffix: true })
-                : cup.status === 'scheduled' && cup.start_at
-                ? formatDistanceToNow(new Date(cup.start_at), { locale: ja, addSuffix: true })
-                : cup.start_at
-                ? format(new Date(cup.start_at), 'M/d')
-                : '—'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Users className="h-4 w-4 shrink-0" />
-            <span className="text-sm">{cup.participant_count ?? 0}人</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card/50 px-3 py-2">
-          <TrendingUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            最小取引量: {cup.min_volume_usdt.toLocaleString()} USDT
+        {/* Participant count overlay */}
+        <div className="absolute bottom-2.5 left-2.5">
+          <span className="inline-flex items-center gap-1 rounded-md bg-black/50 backdrop-blur-sm px-2 py-1 text-xs text-white/80">
+            <Users className="h-3 w-3" />
+            {cup.participant_count ?? 0}人参加
           </span>
         </div>
-
-        {cup.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">{cup.description}</p>
-        )}
       </div>
 
-      {/* Footer */}
-      <div className="px-6 py-4 mt-2">
-        <Link href={`/cup/${cup.id}`}>
-          <Button className="w-full bg-primary hover:bg-primary/90 text-white" size="sm">
-            大会の詳細を見る
-          </Button>
-        </Link>
+      {/* Card body */}
+      <div className="flex flex-col flex-1 p-4 gap-3">
+        <h2 className="font-bold text-base leading-snug text-foreground line-clamp-2">
+          {cup.name}
+        </h2>
+
+        {/* Metadata */}
+        <div className="space-y-1.5 text-xs">
+          <div className="flex items-start gap-2">
+            <CalendarRange className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+            <span className="text-muted-foreground">
+              {formatDate(cup.start_at)} ～ {formatDate(cup.end_at)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Coins className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-foreground font-medium">{cup.pair}</span>
+            <span className="text-muted-foreground">on {cup.exchange.toUpperCase()}</span>
+          </div>
+          {rewardSummary && (
+            <div className="flex items-start gap-2">
+              <Gift className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+              <span className="text-foreground">{rewardSummary}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Buttons */}
+        <div className="flex gap-2 pt-1">
+          {isEnded ? (
+            <>
+              <Link href={`/ranking/${cup.id}`} className="flex-1">
+                <Button variant="outline" className="w-full" size="sm">
+                  <Trophy className="h-3.5 w-3.5 mr-1.5" />
+                  ランキング
+                </Button>
+              </Link>
+              <Link href={`/cup/${cup.id}`} className="flex-1">
+                <Button variant="ghost" className="w-full" size="sm">
+                  詳細を見る
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href={`/cup/${cup.id}`} className="flex-1">
+                <Button className="w-full bg-primary hover:bg-primary/90 text-white" size="sm">
+                  参加登録
+                </Button>
+              </Link>
+              <Link href={`/ranking/${cup.id}`}>
+                <Button variant="outline" size="sm" className="px-3">
+                  <Trophy className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

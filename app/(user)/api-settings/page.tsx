@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, CheckCircle, XCircle, Eye, EyeOff, ArrowLeft, ExternalLink } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle, Eye, EyeOff, ArrowLeft, ExternalLink, Wifi, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -21,6 +21,14 @@ export default function ApiSettingsPage() {
     usdt_balance?: number
     errorMessage?: string
   } | null>(null)
+  const [currentStatus, setCurrentStatus] = useState<{ connected: boolean; saved_at: string | null } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/lbank/status')
+      .then((r) => r.json())
+      .then((d) => setCurrentStatus(d))
+      .catch(() => setCurrentStatus({ connected: false, saved_at: null }))
+  }, [])
 
   const handleTest = async () => {
     if (!apiKey || !apiSecret) {
@@ -73,6 +81,7 @@ export default function ApiSettingsPage() {
       setApiKey('')
       setApiSecret('')
       setTestResult(null)
+      setCurrentStatus({ connected: true, saved_at: new Date().toISOString() })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存に失敗しました')
     } finally {
@@ -93,6 +102,36 @@ export default function ApiSettingsPage() {
         </div>
 
         <div className="space-y-4">
+          {/* 現在の接続状態 */}
+          {currentStatus && (
+            <div className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${
+              currentStatus.connected
+                ? 'border-green-500/40 bg-green-500/10'
+                : 'border-zinc-600/40 bg-zinc-800/40'
+            }`}>
+              {currentStatus.connected ? (
+                <Wifi className="h-5 w-5 text-green-400 shrink-0" />
+              ) : (
+                <WifiOff className="h-5 w-5 text-zinc-400 shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${currentStatus.connected ? 'text-green-400' : 'text-zinc-400'}`}>
+                  {currentStatus.connected ? 'LBank 接続済み' : 'LBank 未接続'}
+                </p>
+                {currentStatus.connected && currentStatus.saved_at && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    登録日時: {new Date(currentStatus.saved_at).toLocaleDateString('ja-JP')}
+                  </p>
+                )}
+                {!currentStatus.connected && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    APIキーを登録して大会に参加できるようにしてください
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>APIキーの取得方法</CardTitle>

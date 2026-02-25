@@ -1,13 +1,25 @@
-import { http } from 'wagmi'
+import { http, createConfig } from 'wagmi'
 import { mainnet, polygon, bsc } from 'wagmi/chains'
-import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { connectorsForWallets } from '@rainbow-me/rainbowkit'
+import { metaMaskWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
 
-// Use a placeholder during build if env var is not set
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'placeholder-project-id'
 
-export const wagmiConfig = getDefaultConfig({
-  appName: 'TradingCup',
-  projectId,
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Recommended',
+      wallets: [metaMaskWallet, walletConnectWallet],
+    },
+  ],
+  {
+    appName: 'TradingCup',
+    projectId,
+  }
+)
+
+export const wagmiConfig = createConfig({
+  connectors,
   chains: [mainnet, polygon, bsc],
   transports: {
     [mainnet.id]: http(),

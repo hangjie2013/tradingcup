@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, exchange, pair, start_at, end_at, min_volume_usdt, description } = body
+    const { name, exchange, pair, start_at, end_at, min_volume_usdt, description, rewards } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
         end_at,
         min_volume_usdt: min_volume_usdt ?? 100,
         description,
+        rewards: rewards ?? [],
         created_by: user.id,
         status: 'draft',
       })
