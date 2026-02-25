@@ -3,6 +3,7 @@ import { jwtVerify } from 'jose'
 import { createServiceClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/crypto/encryption'
 import { getUserInfo } from '@/lib/lbank/api'
+import { exchangeApiKeyRepository } from '@/lib/repositories/exchange-api-key'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
@@ -46,7 +47,6 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // If a new profile was created with a different ID, the JWT is stale
       if (newProfile.id !== profileId) {
         return NextResponse.json(
           { error: 'Session expired — please sign out and sign in again' },
@@ -68,30 +68,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid API credentials' }, { status: 400 })
     }
 
-    const encryptedKey = encrypt(api_key)
-    const encryptedSecret = encrypt(api_secret)
-
-    const { data, error } = await supabase
-      .from('exchange_api_keys')
-      .upsert(
-        {
-          user_id: profileId,
-          encrypted_api_key: encryptedKey,
-          encrypted_api_secret: encryptedSecret,
-          exchange: 'lbank',
-          is_verified: true,
-        },
-        { onConflict: 'user_id,exchange' }
-      )
-      .select('id, exchange, is_verified, created_at')
-      .single()
-
-    if (error) {
-      const msg = error.message.includes('foreign key')
-        ? 'Profile not found — please sign out and sign in again with your wallet'
-        : error.message
-      return NextResponse.json({ error: msg }, { status: 500 })
-    }
+    const data = await exchangeApiKeyRepository.upsert({
+      user_id: profileId,
+      encrypted_api_key: encrypt(api_key),
+      encrypted_api_secret: encrypt(api_secret),
+      exchange: 'lbank',
+      is_verified: true,
+    })
 
     return NextResponse.json({ data })
   } catch (error) {

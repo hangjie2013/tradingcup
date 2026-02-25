@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/crypto/encryption'
 import { getUSDTBalance, getVolumeForPair } from '@/lib/lbank/api'
+import { cupRepository } from '@/lib/repositories/cup'
+import { cupParticipantRepository } from '@/lib/repositories/cup-participant'
+import { exchangeApiKeyRepository } from '@/lib/repositories/exchange-api-key'
 
 export async function POST(request: NextRequest) {
   // Verify cron secret
@@ -12,16 +14,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
-
   try {
-    // Get all active cups
-    const { data: cups, error: cupsError } = await supabase
-      .from('cups')
-      .select('*')
-      .eq('status', 'active')
+    const cups = await cupRepository.findAll({ status: 'active' })
 
-    if (cupsError) throw cupsError
     if (!cups || cups.length === 0) {
       return NextResponse.json({ message: 'No active cups' })
     }
@@ -34,39 +29,22 @@ export async function POST(request: NextRequest) {
 
       // Auto-end cup if past end time
       if (endAt && now > endAt) {
-        await supabase
-          .from('cups')
-          .update({ status: 'ended' })
-          .eq('id', cup.id)
+        await cupRepository.update(cup.id, { status: 'ended' })
         results.push({ cup_id: cup.id, action: 'ended' })
         continue
       }
 
       // Get all non-disqualified participants
-      const { data: participants } = await supabase
-        .from('cup_participants')
-        .select(`
-          *,
-          profiles!inner(id)
-        `)
-        .eq('cup_id', cup.id)
-        .eq('is_disqualified', false)
-
+      const participants = await cupParticipantRepository.findByCupWithApiKeys(cup.id)
       if (!participants || participants.length === 0) continue
 
       const startAt = cup.start_at ? new Date(cup.start_at).getTime() : 0
-      const updatedParticipants = []
+      const updatedParticipants: { user_id: string; pnl_pct: number; volume: number }[] = []
 
       for (const participant of participants) {
         try {
           // Get API key for this user
-          const { data: apiKey } = await supabase
-            .from('exchange_api_keys')
-            .select('encrypted_api_key, encrypted_api_secret')
-            .eq('user_id', participant.user_id)
-            .eq('exchange', 'lbank')
-            .single()
-
+          const apiKey = await exchangeApiKeyRepository.findByUser(participant.user_id, 'lbank')
           if (!apiKey) continue
 
           const key = decrypt(apiKey.encrypted_api_key)
@@ -80,8 +58,8 @@ export async function POST(request: NextRequest) {
           const pnlPct = startBalance > 0 ? (pnl / startBalance) * 100 : 0
           const isEligible = volumeSinceStart >= (cup.min_volume_usdt ?? 100)
 
-          // Save snapshot
-          await supabase.from('cup_snapshots').insert({
+          // Save snapshot (event-sourced record — never overwritten)
+          await cupParticipantRepository.saveSnapshot({
             cup_id: cup.id,
             user_id: participant.user_id,
             balance_usdt: currentBalance,
@@ -89,16 +67,13 @@ export async function POST(request: NextRequest) {
             pnl_pct: pnlPct,
           })
 
-          // Update participant
-          await supabase
-            .from('cup_participants')
-            .update({
-              total_volume_usdt: volumeSinceStart,
-              pnl: pnl,
-              pnl_pct: pnlPct,
-              is_eligible: isEligible,
-            })
-            .eq('id', participant.id)
+          // Update cached stats on participant row
+          await cupParticipantRepository.updateStats(participant.id, {
+            pnl,
+            pnl_pct: pnlPct,
+            total_volume_usdt: volumeSinceStart,
+            is_eligible: isEligible,
+          })
 
           updatedParticipants.push({
             user_id: participant.user_id,
@@ -110,16 +85,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Update rankings (sort by pnl_pct for eligible participants)
-      const eligibleSorted = updatedParticipants
-        .sort((a, b) => b.pnl_pct - a.pnl_pct)
-
-      for (let i = 0; i < eligibleSorted.length; i++) {
-        await supabase
-          .from('cup_participants')
-          .update({ rank: i + 1 })
-          .eq('cup_id', cup.id)
-          .eq('user_id', eligibleSorted[i].user_id)
+      // Update rankings (sort by pnl_pct)
+      const sorted = [...updatedParticipants].sort((a, b) => b.pnl_pct - a.pnl_pct)
+      for (let i = 0; i < sorted.length; i++) {
+        await cupParticipantRepository.updateRank(cup.id, sorted[i].user_id, i + 1)
       }
 
       results.push({ cup_id: cup.id, updated: updatedParticipants.length })

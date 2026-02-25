@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { storageRepository } from '@/lib/storage'
+import { cupRepository } from '@/lib/repositories/cup'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -7,7 +9,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -26,33 +30,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Image must be under 5MB' }, { status: 400 })
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-    const path = `${id}.${ext}`
-    const buffer = await file.arrayBuffer()
+    // Upload and get object_key (not URL)
+    const objectKey = await storageRepository.uploadCupCover(id, file)
 
-    const serviceClient = createServiceClient()
-    const { error: uploadError } = await serviceClient.storage
-      .from('cup-covers')
-      .upload(path, buffer, { contentType: file.type, upsert: true })
+    // Save object_key to both columns: cover_image_key (Phase 3) and cover_image_url (互換)
+    await cupRepository.update(id, {
+      cover_image_key: objectKey,
+      cover_image_url: objectKey,
+    })
 
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
-    }
-
-    const { data: { publicUrl } } = serviceClient.storage
-      .from('cup-covers')
-      .getPublicUrl(path)
-
-    const { error: updateError } = await serviceClient
-      .from('cups')
-      .update({ cover_image_url: publicUrl })
-      .eq('id', id)
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ url: publicUrl })
+    // Return the public URL for immediate use in the UI
+    const url = storageRepository.getCupCoverUrl(objectKey)
+    return NextResponse.json({ url })
   } catch (error) {
     console.error('Cover image upload error:', error)
     return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 })

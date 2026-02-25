@@ -30,11 +30,6 @@ function buildSignature(params: Record<string, string>, secretKey: string): stri
     .update(md5Hash)
     .digest('hex')
 
-  console.log('[LBank sign] sorted keys:', sortedKeys)
-  console.log('[LBank sign] signed string:', sorted)
-  console.log('[LBank sign] md5:', md5Hash)
-  console.log('[LBank sign] signature:', signature)
-
   return signature
 }
 
@@ -96,8 +91,6 @@ async function lbankPost<T>(
   }
 
   const json: LBankResponse<T> = await res.json()
-
-  console.log('[LBank raw response]', JSON.stringify(json))
 
   if (json.result !== 'true' && json.result !== 'True' && json.result !== true) {
     throw new Error(`LBank error ${json.error_code}: ${json.msg ?? 'unknown error'}`)

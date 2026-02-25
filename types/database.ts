@@ -35,6 +35,7 @@ export interface Cup {
   min_volume_usdt: number
   description: string | null
   cover_image_url: string | null
+  cover_image_key: string | null  // object_key (Phase 3移行後の正式フィールド)
   rewards: RewardTier[]
   created_by: string | null
   created_at: string

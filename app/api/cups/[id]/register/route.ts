@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 import { jwtVerify } from 'jose'
 import { decrypt } from '@/lib/crypto/encryption'
 import { getUSDTBalance } from '@/lib/lbank/api'
+import { cupRepository } from '@/lib/repositories/cup'
+import { cupParticipantRepository } from '@/lib/repositories/cup-participant'
+import { exchangeApiKeyRepository } from '@/lib/repositories/exchange-api-key'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
@@ -22,16 +24,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     const { payload } = await jwtVerify(sessionToken, JWT_SECRET)
     const profileId = payload.profile_id as string
 
-    const supabase = createServiceClient()
-
     // Check cup exists and is accepting registrations
-    const { data: cup, error: cupError } = await supabase
-      .from('cups')
-      .select('*')
-      .eq('id', cupId)
-      .single()
-
-    if (cupError || !cup) {
+    const cup = await cupRepository.findById(cupId)
+    if (!cup) {
       return NextResponse.json({ error: 'Cup not found' }, { status: 404 })
     }
 
@@ -43,27 +38,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // Check already registered
-    const { data: existing } = await supabase
-      .from('cup_participants')
-      .select('id')
-      .eq('cup_id', cupId)
-      .eq('user_id', profileId)
-      .single()
-
+    const existing = await cupParticipantRepository.findByUser(cupId, profileId)
     if (existing) {
       return NextResponse.json({ error: 'Already registered' }, { status: 400 })
     }
 
     // Get user's LBank API key
-    const { data: apiKey, error: keyError } = await supabase
-      .from('exchange_api_keys')
-      .select('*')
-      .eq('user_id', profileId)
-      .eq('exchange', 'lbank')
-      .eq('is_verified', true)
-      .single()
-
-    if (keyError || !apiKey) {
+    const apiKey = await exchangeApiKeyRepository.findByUser(profileId, 'lbank')
+    if (!apiKey) {
       return NextResponse.json(
         { error: 'Verified LBank API key required' },
         { status: 400 }
@@ -74,7 +56,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const decryptedKey = decrypt(apiKey.encrypted_api_key)
     const decryptedSecret = decrypt(apiKey.encrypted_api_secret)
 
-    let startBalance = null
+    let startBalance: number | null = null
     try {
       startBalance = await getUSDTBalance(decryptedKey, decryptedSecret)
     } catch (e) {
@@ -82,19 +64,11 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // Register participant
-    const { data: participant, error: regError } = await supabase
-      .from('cup_participants')
-      .insert({
-        cup_id: cupId,
-        user_id: profileId,
-        start_balance_usdt: startBalance,
-      })
-      .select()
-      .single()
-
-    if (regError) {
-      return NextResponse.json({ error: regError.message }, { status: 500 })
-    }
+    const participant = await cupParticipantRepository.create({
+      cup_id: cupId,
+      user_id: profileId,
+      start_balance_usdt: startBalance,
+    })
 
     return NextResponse.json({ data: participant }, { status: 201 })
   } catch (error) {

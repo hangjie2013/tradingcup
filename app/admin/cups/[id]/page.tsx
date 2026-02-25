@@ -15,7 +15,6 @@ import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -54,16 +53,16 @@ export default function AdminCupDetailPage() {
     load()
   }, [id])
 
-  const handleDisqualify = async (participantId: string, userId: string) => {
+  const handleDisqualify = async (participantId: string, _userId: string) => {
     if (!confirm('この参加者を失格にしますか？')) return
 
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('cup_participants')
-      .update({ is_disqualified: true, disqualify_reason: 'admin_forced' })
-      .eq('id', participantId)
+    const res = await fetch(`/api/admin/cups/${id}/disqualify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participant_id: participantId, reason: 'admin_forced' }),
+    })
 
-    if (error) {
+    if (!res.ok) {
       toast.error('失格処理に失敗しました')
     } else {
       setParticipants((prev) =>
