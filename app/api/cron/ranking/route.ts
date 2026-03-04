@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cupRepository } from '@/lib/repositories/cup'
-import { processCupRanking } from '@/lib/cron/process-cup-ranking'
+import { processCupRanking } from '@/lib/cup/process-ranking'
 
 export async function POST(request: NextRequest) {
   // Verify cron secret

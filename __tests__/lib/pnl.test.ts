@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculatePNL, calculateTotalBalance } from '@/lib/pnl'
+import { calculatePNL, calculateTotalBalance } from '@/lib/cup/pnl'
 
 describe('calculateTotalBalance', () => {
   it('USDT + IZKY × price で総資産を計算する', () => {

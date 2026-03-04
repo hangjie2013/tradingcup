@@ -1,6 +1,6 @@
 import { decrypt } from '@/lib/crypto/encryption'
 import { getTotalBalanceUSDT, getVolumeForPair, getDepositHistory, getWithdrawalHistory } from '@/lib/lbank/api'
-import { calculatePNL } from '@/lib/pnl'
+import { calculatePNL } from '@/lib/cup/pnl'
 import { cupParticipantRepository } from '@/lib/repositories/cup-participant'
 import { exchangeApiKeyRepository } from '@/lib/repositories/exchange-api-key'
 import { Cup } from '@/types/database'

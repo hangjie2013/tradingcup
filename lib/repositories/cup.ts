@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { Cup, CupStatus, CupDbStatus } from '@/types/database'
-import { withComputedStatus } from '@/lib/cup-status'
+import { withComputedStatus } from '@/lib/cup/status'
 import { storageRepository } from '@/lib/storage'
 
 export interface CupCreateInput {
