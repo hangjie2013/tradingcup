@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decrypt } from '@/lib/crypto/encryption'
-import { getUSDTBalance, getVolumeForPair } from '@/lib/lbank/api'
 import { cupRepository } from '@/lib/repositories/cup'
-import { cupParticipantRepository } from '@/lib/repositories/cup-participant'
-import { exchangeApiKeyRepository } from '@/lib/repositories/exchange-api-key'
+import { processCupRanking } from '@/lib/cron/process-cup-ranking'
 
 export async function POST(request: NextRequest) {
   // Verify cron secret
@@ -15,6 +12,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // computedStatus='active' のcupを取得（期間ベースで自動判定）
     const cups = await cupRepository.findAll({ status: 'active' })
 
     if (!cups || cups.length === 0) {
@@ -24,74 +22,8 @@ export async function POST(request: NextRequest) {
     const results = []
 
     for (const cup of cups) {
-      const now = new Date()
-      const endAt = cup.end_at ? new Date(cup.end_at) : null
-
-      // Auto-end cup if past end time
-      if (endAt && now > endAt) {
-        await cupRepository.update(cup.id, { status: 'ended' })
-        results.push({ cup_id: cup.id, action: 'ended' })
-        continue
-      }
-
-      // Get all non-disqualified participants
-      const participants = await cupParticipantRepository.findByCupWithApiKeys(cup.id)
-      if (!participants || participants.length === 0) continue
-
-      const startAt = cup.start_at ? new Date(cup.start_at).getTime() : 0
-      const updatedParticipants: { user_id: string; pnl_pct: number; volume: number }[] = []
-
-      for (const participant of participants) {
-        try {
-          // Get API key for this user
-          const apiKey = await exchangeApiKeyRepository.findByUser(participant.user_id, 'lbank')
-          if (!apiKey) continue
-
-          const key = decrypt(apiKey.encrypted_api_key)
-          const secret = decrypt(apiKey.encrypted_api_secret)
-
-          const currentBalance = await getUSDTBalance(key, secret)
-          const volumeSinceStart = await getVolumeForPair(key, secret, startAt)
-
-          const startBalance = participant.start_balance_usdt ?? currentBalance
-          const pnl = currentBalance - startBalance
-          const pnlPct = startBalance > 0 ? (pnl / startBalance) * 100 : 0
-          const isEligible = volumeSinceStart >= (cup.min_volume_usdt ?? 100)
-
-          // Save snapshot (event-sourced record — never overwritten)
-          await cupParticipantRepository.saveSnapshot({
-            cup_id: cup.id,
-            user_id: participant.user_id,
-            balance_usdt: currentBalance,
-            volume_since_start: volumeSinceStart,
-            pnl_pct: pnlPct,
-          })
-
-          // Update cached stats on participant row
-          await cupParticipantRepository.updateStats(participant.id, {
-            pnl,
-            pnl_pct: pnlPct,
-            total_volume_usdt: volumeSinceStart,
-            is_eligible: isEligible,
-          })
-
-          updatedParticipants.push({
-            user_id: participant.user_id,
-            pnl_pct: pnlPct,
-            volume: volumeSinceStart,
-          })
-        } catch (err) {
-          console.error(`Error processing participant ${participant.user_id}:`, err)
-        }
-      }
-
-      // Update rankings (sort by pnl_pct)
-      const sorted = [...updatedParticipants].sort((a, b) => b.pnl_pct - a.pnl_pct)
-      for (let i = 0; i < sorted.length; i++) {
-        await cupParticipantRepository.updateRank(cup.id, sorted[i].user_id, i + 1)
-      }
-
-      results.push({ cup_id: cup.id, updated: updatedParticipants.length })
+      const result = await processCupRanking(cup)
+      results.push(result)
     }
 
     return NextResponse.json({ success: true, results })
