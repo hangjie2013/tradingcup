@@ -29,15 +29,22 @@ export function CupForm({ cup, mode = 'create' }: CupFormProps) {
       { rank: '3位', reward: '' },
     ]
   )
+  // 表示用ステータス（scheduled/active/ended）はDB値 published に正規化
+  const toDbStatus = (s: string) =>
+    ['scheduled', 'active', 'ended'].includes(s) ? 'published' : s
+
+  const isFinalized = cup?.status === 'finalized'
+
   const [form, setForm] = useState({
     name: cup?.name ?? '',
     description: cup?.description ?? '',
     pair: cup?.pair ?? 'IZKY/USDT',
     exchange: cup?.exchange ?? 'lbank',
     min_volume_usdt: cup?.min_volume_usdt?.toString() ?? '100',
+    min_balance_usdt: cup?.min_balance_usdt?.toString() ?? '10',
     start_at: cup?.start_at ? new Date(cup.start_at).toISOString().slice(0, 16) : '',
     end_at: cup?.end_at ? new Date(cup.end_at).toISOString().slice(0, 16) : '',
-    status: cup?.status ?? 'draft',
+    status: toDbStatus(cup?.status ?? 'draft'),
   })
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,10 +71,18 @@ export function CupForm({ cup, mode = 'create' }: CupFormProps) {
     e.preventDefault()
     setLoading(true)
 
+    // 終了日時 >= 開始日時 バリデーション
+    if (form.start_at && form.end_at && form.end_at < form.start_at) {
+      toast.error('終了日時は開始日時以降に設定してください')
+      setLoading(false)
+      return
+    }
+
     try {
       const payload = {
         ...form,
         min_volume_usdt: parseFloat(form.min_volume_usdt),
+        min_balance_usdt: parseFloat(form.min_balance_usdt),
         start_at: form.start_at ? new Date(form.start_at).toISOString() : null,
         end_at: form.end_at ? new Date(form.end_at).toISOString() : null,
         rewards: rewards.filter(r => r.rank.trim() && r.reward.trim()),
@@ -111,6 +126,13 @@ export function CupForm({ cup, mode = 'create' }: CupFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {isFinalized && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          この大会は確定済みのため、編集できません。
+        </div>
+      )}
+
+      <fieldset disabled={isFinalized} className="space-y-6">
       {/* Cover image */}
       <Card>
         <CardHeader>
@@ -251,16 +273,29 @@ export function CupForm({ cup, mode = 'create' }: CupFormProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="min_volume">最小取引量 (USDT)</Label>
-            <Input
-              id="min_volume"
-              type="number"
-              min="0"
-              step="1"
-              value={form.min_volume_usdt}
-              onChange={(e) => setForm({ ...form, min_volume_usdt: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="min_volume">最低取引量 (USDT)</Label>
+              <Input
+                id="min_volume"
+                type="number"
+                min="0"
+                step="1"
+                value={form.min_volume_usdt}
+                onChange={(e) => setForm({ ...form, min_volume_usdt: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="min_balance">最低残高 (USDT)</Label>
+              <Input
+                id="min_balance"
+                type="number"
+                min="0"
+                step="1"
+                value={form.min_balance_usdt}
+                onChange={(e) => setForm({ ...form, min_balance_usdt: e.target.value })}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -279,8 +314,12 @@ export function CupForm({ cup, mode = 'create' }: CupFormProps) {
                 id="end_at"
                 type="datetime-local"
                 value={form.end_at}
+                min={form.start_at || undefined}
                 onChange={(e) => setForm({ ...form, end_at: e.target.value })}
               />
+              {form.start_at && form.end_at && form.end_at < form.start_at && (
+                <p className="text-xs text-destructive">終了日時は開始日時以降に設定してください</p>
+              )}
             </div>
           </div>
 
@@ -289,26 +328,28 @@ export function CupForm({ cup, mode = 'create' }: CupFormProps) {
               <Label htmlFor="status">ステータス</Label>
               <Select
                 value={form.status}
-                onValueChange={(v) => setForm({ ...form, status: v as import('@/types').CupStatus })}
+                onValueChange={(v) => setForm({ ...form, status: v })}
+                disabled={isFinalized}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">下書き</SelectItem>
-                  <SelectItem value="scheduled">予定</SelectItem>
-                  <SelectItem value="active">開催中</SelectItem>
-                  <SelectItem value="ended">終了</SelectItem>
+                  <SelectItem value="published">公開（期間に応じて予定/開催中/終了）</SelectItem>
                   <SelectItem value="finalized">確定</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                「確定」として保存すると、以降ステータスの変更はできません。
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading || isFinalized}>
           {loading ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 保存中...</>
           ) : (
@@ -319,6 +360,7 @@ export function CupForm({ cup, mode = 'create' }: CupFormProps) {
           キャンセル
         </Button>
       </div>
+      </fieldset>
     </form>
   )
 }

@@ -33,10 +33,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Upload and get object_key (not URL)
     const objectKey = await storageRepository.uploadCupCover(id, file)
 
-    // Save object_key to both columns: cover_image_key (Phase 3) and cover_image_url (互換)
+    // Save object_key to cover_image_key（URLはRepository層で都度解決）
     await cupRepository.update(id, {
       cover_image_key: objectKey,
-      cover_image_url: objectKey,
     })
 
     // Return the public URL for immediate use in the UI

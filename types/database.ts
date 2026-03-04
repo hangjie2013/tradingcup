@@ -1,3 +1,7 @@
+/** DB保存用ステータス（3値） */
+export type CupDbStatus = 'draft' | 'published' | 'finalized'
+
+/** 表示用ステータス（期間から算出される値を含む） */
 export type CupStatus = 'draft' | 'scheduled' | 'active' | 'ended' | 'finalized'
 
 export interface RewardTier {
@@ -33,6 +37,7 @@ export interface Cup {
   start_at: string | null
   end_at: string | null
   min_volume_usdt: number
+  min_balance_usdt: number
   description: string | null
   cover_image_url: string | null
   cover_image_key: string | null  // object_key (Phase 3移行後の正式フィールド)
@@ -74,6 +79,15 @@ export interface DisqualificationLog {
   reason: DisqualifyReason
   detected_at: string
   admin_user_id: string | null
+}
+
+export interface Banner {
+  id: string
+  image_key: string
+  link_url: string | null
+  sort_order: number
+  is_active: boolean
+  created_at: string
 }
 
 // Extended types with joins

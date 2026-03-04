@@ -19,12 +19,15 @@ export interface RankingUpdate {
 export const cupParticipantRepository = {
   async findByUser(cupId: string, userId: string): Promise<CupParticipant | null> {
     const supabase = createServiceClient()
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('cup_participants')
       .select('*')
       .eq('cup_id', cupId)
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
+
+    // DB障害時は例外を上げる（重複チェックを素通りさせない）
+    if (error) throw error
     return data ?? null
   },
 
@@ -96,11 +99,38 @@ export const cupParticipantRepository = {
     return data
   },
 
-  async disqualify(participantId: string, reason: DisqualifyReason): Promise<void> {
+  async disqualify(participantId: string, reason: DisqualifyReason, adminUserId?: string): Promise<void> {
     const supabase = createServiceClient()
+
+    // Update participant status
     const { error } = await supabase
       .from('cup_participants')
       .update({ is_disqualified: true, disqualify_reason: reason })
+      .eq('id', participantId)
+    if (error) throw error
+
+    // 監査ログを記録（disqualification_log テーブル）
+    const participant = await this.findById(participantId)
+    if (participant) {
+      const { error: logError } = await supabase
+        .from('disqualification_log')
+        .insert({
+          cup_id: participant.cup_id,
+          user_id: participant.user_id,
+          reason,
+          admin_user_id: adminUserId ?? null,
+        })
+      if (logError) {
+        console.error('Failed to write disqualification log:', logError)
+      }
+    }
+  },
+
+  async updateStartBalance(participantId: string, startBalance: number): Promise<void> {
+    const supabase = createServiceClient()
+    const { error } = await supabase
+      .from('cup_participants')
+      .update({ start_balance_usdt: startBalance })
       .eq('id', participantId)
     if (error) throw error
   },

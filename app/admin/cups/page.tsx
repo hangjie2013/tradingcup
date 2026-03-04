@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Cup } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,22 +8,22 @@ import { Card, CardContent } from '@/components/ui/card'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
-import { Plus, LogOut, Loader2, Eye, Pencil } from 'lucide-react'
+import { Plus, Loader2, Eye, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { AdminHeader } from '@/components/admin/AdminHeader'
 
-const statusBadge: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
-  draft: { label: '下書き', variant: 'secondary' },
-  scheduled: { label: '予定', variant: 'outline' },
-  active: { label: '開催中', variant: 'default' },
-  ended: { label: '終了', variant: 'secondary' },
-  finalized: { label: '確定', variant: 'secondary' },
+const statusBadge: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline'; className: string }> = {
+  draft:     { label: '下書き', variant: 'outline', className: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+  scheduled: { label: '予定',   variant: 'outline', className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  active:    { label: '開催中', variant: 'outline', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  ended:     { label: '終了',   variant: 'outline', className: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  finalized: { label: '確定',   variant: 'outline', className: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
 }
 
 export default function AdminCupsPage() {
-  const router = useRouter()
   const [cups, setCups] = useState<Cup[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -45,23 +43,9 @@ export default function AdminCupsPage() {
     load()
   }, [])
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/admin/login')
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/40">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="font-bold text-lg">TradingCup 管理</h1>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            ログアウト
-          </Button>
-        </div>
-      </header>
+      <AdminHeader />
 
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -96,7 +80,7 @@ export default function AdminCupsPage() {
                   <TableHead>ステータス</TableHead>
                   <TableHead className="hidden sm:table-cell">開始</TableHead>
                   <TableHead className="hidden sm:table-cell">終了</TableHead>
-                  <TableHead className="hidden sm:table-cell">最小取引量</TableHead>
+                  <TableHead className="hidden sm:table-cell">最低取引量</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -107,7 +91,7 @@ export default function AdminCupsPage() {
                     <TableRow key={cup.id} className="border-border/30">
                       <TableCell className="font-medium">{cup.name}</TableCell>
                       <TableCell>
-                        <Badge variant={badge.variant} className={cup.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' : ''}>
+                        <Badge variant={badge.variant} className={badge.className}>
                           {badge.label}
                         </Badge>
                       </TableCell>
@@ -123,13 +107,15 @@ export default function AdminCupsPage() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Link href={`/admin/cups/${cup.id}`}>
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" className="gap-1.5">
                               <Eye className="h-4 w-4" />
+                              詳細
                             </Button>
                           </Link>
                           <Link href={`/admin/cups/new?edit=${cup.id}`}>
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" className="gap-1.5">
                               <Pencil className="h-4 w-4" />
+                              編集
                             </Button>
                           </Link>
                         </div>

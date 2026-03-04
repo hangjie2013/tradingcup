@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
-import { getUserInfo, getUSDTBalance } from '@/lib/lbank/api'
+import {
+  getUserInfo, getUSDTBalance, getAccountBalance, getAccountBalanceRaw,
+  getTransactionHistoryRaw, getVolumeForPair, getTotalBalanceUSDT,
+} from '@/lib/lbank/api'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
@@ -36,9 +39,42 @@ export async function POST(request: NextRequest) {
 
   try {
     const userInfo = await getUserInfo(api_key, api_secret)
+    const rawBalance = await getAccountBalanceRaw(api_key, api_secret)
+    const allBalances = await getAccountBalance(api_key, api_secret)
     const usdtBalance = await getUSDTBalance(api_key, api_secret)
+    const { totalUSDT, izkyPrice } = await getTotalBalanceUSDT(api_key, api_secret)
+
+    // 保有アセットから IZKY 系のシンボル候補を推定
+    const izkyAsset = allBalances.find((b) =>
+      b.asset.toLowerCase().includes('izky') || b.asset.toLowerCase().includes('izakaya')
+    )
+
+    // 取引履歴: エラーでも他の結果は返す
+    let rawTrades: unknown = null
+    let tradesError: string | null = null
+    let volume = 0
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+    try {
+      rawTrades = await getTransactionHistoryRaw(api_key, api_secret, 'izky_usdt', thirtyDaysAgo, 10)
+      volume = await getVolumeForPair(api_key, api_secret, thirtyDaysAgo)
+    } catch (e) {
+      tradesError = e instanceof Error ? e.message : String(e)
+    }
+
     return NextResponse.json({
-      data: { uid: userInfo.uid, usdt_balance: usdtBalance, connected: true },
+      data: {
+        uid: userInfo.uid,
+        usdt_balance: usdtBalance,
+        total_balance_usdt: totalUSDT,
+        izky_price: izkyPrice,
+        balances: allBalances,
+        izky_asset_found: izkyAsset ?? null,
+        volume_usdt_30d: volume,
+        trades_error: tradesError,
+        _debug_raw_balance: rawBalance,
+        _debug_raw_trades: rawTrades,
+        connected: true,
+      },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'LBank connection failed'

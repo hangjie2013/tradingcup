@@ -6,7 +6,9 @@
       "Bash(python3:*)",
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "WebFetch(domain:www.trade-island.jp)",
+      "WebSearch"
     ]
   }
 }

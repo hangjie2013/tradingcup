@@ -1,6 +1,15 @@
 import { createHash, createHmac } from 'crypto'
 
+const MOCK_MODE = process.env.LBANK_MOCK_MODE === 'true'
 const LBANK_BASE_URL = 'https://api.lbkex.com'
+
+// モックモジュールは MOCK_MODE=true 時のみ動的にロードする（本番でimportされることを防ぐ）
+async function getMock() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: LBank mock mode must not be used in production')
+  }
+  return import('./mock')
+}
 
 interface LBankRequestParams {
   [key: string]: string | number
@@ -99,23 +108,51 @@ async function lbankPost<T>(
   return json.data as T
 }
 
+// Get raw account balance response (for debugging)
+export async function getAccountBalanceRaw(
+  apiKey: string,
+  secretKey: string
+): Promise<unknown> {
+  if (MOCK_MODE) return (await getMock()).mockGetAccountBalanceRaw(apiKey, secretKey)
+  return lbankPost<unknown>(
+    '/v2/supplement/user_info_account.do', {}, apiKey, secretKey
+  )
+}
+
 // Get account balance
 export async function getAccountBalance(
   apiKey: string,
   secretKey: string
 ): Promise<{ asset: string; available: string; freeze: string }[]> {
-  const data = await lbankPost<{
-    info: { free: Record<string, string>; freeze: Record<string, string> }
-  }>('/v2/supplement/user_info_account.do', {}, apiKey, secretKey)
+  if (MOCK_MODE) return (await getMock()).mockGetAccountBalance(apiKey, secretKey)
+  const data = await getAccountBalanceRaw(apiKey, secretKey)
 
-  const free = data.info?.free ?? {}
-  const freeze = data.info?.freeze ?? {}
+  // LBank v2 実レスポンス形式:
+  // { uid: "...", balances: [ { asset: "usdt", free: "15", locked: "0" }, ... ] }
+  if (typeof data === 'object' && data !== null) {
+    const obj = data as Record<string, unknown>
 
-  return Object.keys(free).map((asset) => ({
-    asset,
-    available: free[asset] ?? '0',
-    freeze: freeze[asset] ?? '0',
-  }))
+    // balances 配列形式（実環境で確認済み）
+    if (Array.isArray(obj.balances)) {
+      return (obj.balances as Record<string, string>[]).map((item) => ({
+        asset: item.asset ?? item.coin ?? '',
+        available: item.free ?? '0',
+        freeze: item.locked ?? item.freeze ?? '0',
+      }))
+    }
+  }
+
+  // トップレベルが配列の場合
+  if (Array.isArray(data)) {
+    return (data as Record<string, string>[]).map((item) => ({
+      asset: item.asset ?? item.coin ?? '',
+      available: item.free ?? '0',
+      freeze: item.locked ?? item.freeze ?? '0',
+    }))
+  }
+
+  console.error('Unexpected getAccountBalance response structure:', JSON.stringify(data))
+  return []
 }
 
 // Get USDT balance specifically
@@ -123,10 +160,35 @@ export async function getUSDTBalance(
   apiKey: string,
   secretKey: string
 ): Promise<number> {
+  if (MOCK_MODE) return (await getMock()).mockGetUSDTBalance(apiKey, secretKey)
   const balances = await getAccountBalance(apiKey, secretKey)
   const usdt = balances.find((b) => b.asset.toLowerCase() === 'usdt')
   if (!usdt) return 0
   return parseFloat(usdt.available) + parseFloat(usdt.freeze)
+}
+
+// Get raw transaction history response (for debugging)
+export async function getTransactionHistoryRaw(
+  apiKey: string,
+  secretKey: string,
+  symbol: string = 'izky_usdt',
+  startTime?: number,
+  limit: number = 10
+): Promise<unknown> {
+  if (MOCK_MODE) return (await getMock()).mockGetTransactionHistoryRaw(apiKey, secretKey, symbol, startTime, limit)
+  const params: LBankRequestParams = {
+    symbol,
+    current_page: 1,
+    page_length: limit,
+  }
+  if (startTime) params['start_date'] = startTime
+
+  return lbankPost<unknown>(
+    '/v2/supplement/transaction_history.do',
+    params,
+    apiKey,
+    secretKey
+  )
 }
 
 // Get transaction history for a symbol
@@ -147,6 +209,7 @@ export async function getTransactionHistory(
   dealPrice: string
   transactTime: string
 }[]> {
+  if (MOCK_MODE) return (await getMock()).mockGetTransactionHistory(apiKey, secretKey, symbol, startTime, endTime, limit)
   const params: LBankRequestParams = {
     symbol,
     current_page: 1,
@@ -170,6 +233,7 @@ export async function getUserInfo(
   apiKey: string,
   secretKey: string
 ): Promise<{ uid: string }> {
+  if (MOCK_MODE) return (await getMock()).mockGetUserInfo(apiKey, secretKey)
   return lbankPost<{ uid: string }>(
     '/v2/supplement/user_info.do',
     {},
@@ -178,12 +242,99 @@ export async function getUserInfo(
   )
 }
 
+// Get deposit history (CLAUDE.md 3.2② 入出金で失格)
+export async function getDepositHistory(
+  apiKey: string,
+  secretKey: string,
+  startTime: number,
+  endTime: number
+): Promise<{ id: string; amount: string; coin: string; status: string; timestamp: number }[]> {
+  if (MOCK_MODE) return (await getMock()).mockGetDepositHistory(apiKey, secretKey, startTime, endTime)
+  const params: LBankRequestParams = {
+    status: '2', // "2" = success
+    startTime,
+    endTime,
+  }
+
+  const data = await lbankPost<{
+    list: { id: string; amount: string; coin: string; status: string; insertTime: number }[]
+  }>('/v2/spot/wallet/deposit_history.do', params, apiKey, secretKey)
+
+  return (data?.list ?? []).map((d) => ({
+    id: d.id,
+    amount: d.amount,
+    coin: d.coin,
+    status: d.status,
+    timestamp: d.insertTime,
+  }))
+}
+
+// Get withdrawal history (CLAUDE.md 3.2② 入出金で失格)
+export async function getWithdrawalHistory(
+  apiKey: string,
+  secretKey: string,
+  startTime: number,
+  endTime: number
+): Promise<{ id: string; amount: string; coin: string; status: string; timestamp: number }[]> {
+  if (MOCK_MODE) return (await getMock()).mockGetWithdrawalHistory(apiKey, secretKey, startTime, endTime)
+  const params: LBankRequestParams = {
+    status: '4', // "4" = completed
+    startTime,
+    endTime,
+  }
+
+  const data = await lbankPost<{
+    list: { id: string; amount: string; coin: string; status: string; createTime: number }[]
+  }>('/v2/spot/wallet/withdraws.do', params, apiKey, secretKey)
+
+  return (data?.list ?? []).map((w) => ({
+    id: w.id,
+    amount: w.amount,
+    coin: w.coin,
+    status: w.status,
+    timestamp: w.createTime,
+  }))
+}
+
+// Get current IZKY/USDT price from public ticker API (no auth required)
+export async function getIZKYPrice(): Promise<number> {
+  if (MOCK_MODE) return (await getMock()).mockGetIZKYPrice()
+  const res = await fetch(`${LBANK_BASE_URL}/v2/ticker/24hr.do?symbol=izky_usdt`)
+  if (!res.ok) throw new Error(`LBank ticker API error: ${res.status}`)
+  const json = await res.json()
+  const price = parseFloat(json?.data?.[0]?.ticker?.latest ?? '0')
+  if (price <= 0) throw new Error('Failed to get valid IZKY price')
+  return price
+}
+
+// Get total balance in USDT (USDT + IZKY × current price)
+// CLAUDE.md: 総資産 = USDT残高 + IZKY残高 × 時点価格
+export async function getTotalBalanceUSDT(
+  apiKey: string,
+  secretKey: string
+): Promise<{ totalUSDT: number; izkyPrice: number }> {
+  if (MOCK_MODE) return (await getMock()).mockGetTotalBalanceUSDT(apiKey, secretKey)
+  const [balances, izkyPrice] = await Promise.all([
+    getAccountBalance(apiKey, secretKey),
+    getIZKYPrice(),
+  ])
+  const usdt = balances.find((b) => b.asset.toLowerCase() === 'usdt')
+  const izky = balances.find((b) => b.asset.toLowerCase() === 'izky')
+  const usdtTotal = parseFloat(usdt?.available ?? '0') + parseFloat(usdt?.freeze ?? '0')
+  const izkyTotal = parseFloat(izky?.available ?? '0') + parseFloat(izky?.freeze ?? '0')
+  return {
+    totalUSDT: usdtTotal + izkyTotal * izkyPrice,
+    izkyPrice,
+  }
+}
+
 // Calculate total volume for IZKY/USDT since a given time
 export async function getVolumeForPair(
   apiKey: string,
   secretKey: string,
   startTimestamp: number
 ): Promise<number> {
+  if (MOCK_MODE) return (await getMock()).mockGetVolumeForPair(apiKey, secretKey, startTimestamp)
   const trades = await getTransactionHistory(
     apiKey,
     secretKey,

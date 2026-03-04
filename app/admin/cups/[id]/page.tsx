@@ -20,13 +20,22 @@ function truncateAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
+/** 表示用ステータス（算出後の値を含む） */
 const statusLabels: Record<string, string> = {
   draft: '下書き',
   scheduled: '予定',
   active: '開催中',
   ended: '終了',
   finalized: '確定',
+  published: '公開中',
 }
+
+/** 管理者が操作できるDB保存用ステータス */
+const dbStatusButtons = [
+  { value: 'draft', label: '下書き' },
+  { value: 'published', label: '公開' },
+  { value: 'finalized', label: '確定' },
+] as const
 
 export default function AdminCupDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -135,20 +144,53 @@ export default function AdminCupDetailPage() {
         <Card className="border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">ステータス管理</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              現在の表示ステータス: {statusLabels[cup.status] ?? cup.status}
+              {['scheduled', 'active', 'ended'].includes(cup.status) && ' （期間から自動算出）'}
+            </p>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {['draft', 'scheduled', 'active', 'ended'].map((s) => (
-                <Button
-                  key={s}
-                  variant={cup.status === s ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusChange(s)}
-                  disabled={cup.status === s || cup.status === 'finalized'}
-                >
-                  {statusLabels[s]}
-                </Button>
-              ))}
+              {dbStatusButtons.map(({ value, label }) => {
+                // published 系（scheduled/active/ended）の場合、published ボタンをアクティブに
+                const isActive = value === 'published'
+                  ? ['scheduled', 'active', 'ended'].includes(cup.status)
+                  : cup.status === value
+                return (
+                  <Button
+                    key={value}
+                    variant={isActive ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleStatusChange(value)}
+                    disabled={isActive || cup.status === 'finalized'}
+                  >
+                    {label}
+                  </Button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Participation conditions */}
+        <Card className="border-border/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">参加条件</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs mb-1">最低取引量</p>
+                <p className="font-semibold">{cup.min_volume_usdt?.toLocaleString() ?? 100} USDT</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-1">最低残高</p>
+                <p className="font-semibold">{(cup.min_balance_usdt ?? 10).toLocaleString()} USDT</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-1">入出金</p>
+                <p className="font-semibold">検出時に失格</p>
+              </div>
             </div>
           </CardContent>
         </Card>
