@@ -19,8 +19,8 @@ export function MyRankCard({ participant, totalParticipants }: MyRankCardProps) 
 
   return (
     <div className="sticky bottom-4 px-4">
-      <Card className="border-primary/30 bg-card/90 backdrop-blur shadow-lg">
-        <CardContent className="py-3 px-4">
+      <Card className="border-primary/30 bg-card/90 backdrop-blur shadow-lg rounded-2xl">
+        <CardContent className="py-4 px-5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="text-sm text-muted-foreground">自分の順位</div>

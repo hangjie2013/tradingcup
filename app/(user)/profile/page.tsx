@@ -1,24 +1,24 @@
 'use client'
 
-import { useAccount } from 'wagmi'
 import { ConnectButton } from '@/components/wallet/ConnectButton'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Key, User, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Key, User, Copy, Check, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/lib/auth/AuthContext'
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 10)}...${address.slice(-8)}`
 }
 
 export default function ProfilePage() {
-  const { address, isConnected } = useAccount()
+  const { isAuthenticated, isChecking, walletAddress } = useAuth()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
-    if (!address) return
-    navigator.clipboard.writeText(address)
+    if (!walletAddress) return
+    navigator.clipboard.writeText(walletAddress)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -38,7 +38,11 @@ export default function ProfilePage() {
       <main className="container mx-auto px-4 py-8 max-w-xl">
         <h1 className="text-2xl font-bold mb-6">プロフィール</h1>
 
-        {!isConnected ? (
+        {isChecking ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !isAuthenticated ? (
           <Card className="border-border/50">
             <CardContent className="pt-6 text-center space-y-4">
               <User className="h-12 w-12 mx-auto text-muted-foreground/30" />
@@ -55,7 +59,7 @@ export default function ProfilePage() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-sm">
-                    {address ? truncateAddress(address) : '—'}
+                    {walletAddress ? truncateAddress(walletAddress) : '—'}
                   </span>
                   <Button variant="ghost" size="sm" onClick={handleCopy}>
                     {copied ? (

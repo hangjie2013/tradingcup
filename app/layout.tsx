@@ -25,6 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
         <Providers>{children}</Providers>
       </body>

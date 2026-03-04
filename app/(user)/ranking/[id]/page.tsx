@@ -9,7 +9,7 @@ import { MyRankCard } from '@/components/ranking/MyRankCard'
 import { ConnectButton } from '@/components/wallet/ConnectButton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, RefreshCw, Loader2, Trophy } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Loader2, Trophy, Users, TrendingUp } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Link from 'next/link'
@@ -51,7 +51,7 @@ export default function RankingPage() {
 
   useEffect(() => {
     fetchRanking()
-    const interval = setInterval(() => fetchRanking(true), 30 * 1000)
+    const interval = setInterval(() => fetchRanking(true), 30 * 60 * 1000)
     return () => clearInterval(interval)
   }, [fetchRanking])
 
@@ -84,7 +84,7 @@ export default function RankingPage() {
 
       <main className="container mx-auto px-4 py-6 max-w-3xl">
         {/* Title */}
-        <div className="flex items-start justify-between mb-6 gap-4">
+        <div className="flex items-start justify-between mb-4 gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="h-5 w-5 text-primary" />
@@ -112,7 +112,31 @@ export default function RankingPage() {
           </Button>
         </div>
 
-        <RankingTable participants={participants} currentUserWallet={address} />
+        {/* Stats bar */}
+        {cup && (
+          <div className="flex flex-wrap gap-3 mb-6">
+            <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-card px-4 py-2.5 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">参加者</span>
+              <span className="font-semibold text-foreground">{participants.length}人</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-card px-4 py-2.5 text-sm">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">ペア</span>
+              <span className="font-semibold text-foreground">{cup.pair}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-card px-4 py-2.5 text-sm">
+              <span className="text-muted-foreground">取引所</span>
+              <span className="font-semibold text-foreground">{cup.exchange.toUpperCase()}</span>
+            </div>
+          </div>
+        )}
+
+        <RankingTable
+          participants={participants}
+          currentUserWallet={address}
+          lastUpdated={lastUpdated}
+        />
       </main>
 
       {myParticipant && (

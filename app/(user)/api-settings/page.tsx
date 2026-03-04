@@ -95,7 +95,7 @@ export default function ApiSettingsPage() {
         <div className="mb-6">
           <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm mb-4">
             <ArrowLeft className="h-4 w-4" />
-            ロビーに戻る
+            カップ戦に戻る
           </Link>
           <h1 className="text-2xl font-bold">LBank API設定</h1>
           <p className="text-muted-foreground mt-1">大会に参加するにはLBankアカウントを接続してください</p>

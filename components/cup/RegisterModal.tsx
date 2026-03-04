@@ -71,24 +71,24 @@ export function RegisterModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
-          <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-sm text-muted-foreground">
-            <ul className="space-y-1 list-disc list-inside">
+        <div className="space-y-4 py-2">
+          <div className="rounded-xl border border-border/50 bg-muted/30 p-4 text-sm text-muted-foreground">
+            <ul className="space-y-2 list-disc list-inside">
               <li>LBankのAPIキーが認証済みである必要があります</li>
               <li>大会期間中の入出金は即座に失格となります</li>
-              <li>賞品対象となるには最小取引量を満たす必要があります</li>
+              <li>賞品対象となるには最低取引量を満たす必要があります</li>
             </ul>
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="flex items-center gap-2.5 rounded-xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error}
             </div>
           )}
 
           {done && (
-            <div className="flex items-center gap-2 rounded-lg border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-400">
+            <div className="flex items-center gap-2.5 rounded-xl border border-green-500/50 bg-green-500/10 p-4 text-sm text-green-400">
               <CheckCircle className="h-4 w-4 shrink-0" />
               参加登録が完了しました！
             </div>

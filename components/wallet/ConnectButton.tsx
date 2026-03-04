@@ -2,31 +2,21 @@
 
 import { ConnectButton as RainbowConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount, useSignMessage } from 'wagmi'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '@/lib/auth/AuthContext'
 
 interface ConnectButtonProps {
   onAuthenticated?: (walletAddress: string) => void
 }
 
 export function ConnectButton({ onAuthenticated }: ConnectButtonProps) {
-  const { address, isConnected } = useAccount()
+  const { address } = useAccount()
   const { signMessageAsync } = useSignMessage()
+  const { isAuthenticated, isChecking, setAuthenticated } = useAuth()
   const [isAuthenticating, setIsAuthenticating] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const res = await fetch('/api/auth/wallet/check', { method: 'GET' }).catch(() => null)
-      if (res?.ok) {
-        const data = await res.json()
-        if (data.authenticated) setIsAuthenticated(true)
-      }
-    }
-    if (isConnected) checkSession()
-  }, [isConnected])
 
   const handleSignIn = async () => {
     if (!address) return
@@ -49,7 +39,8 @@ export function ConnectButton({ onAuthenticated }: ConnectButtonProps) {
         throw new Error(err.error ?? '認証に失敗しました')
       }
 
-      setIsAuthenticated(true)
+      const data = await res.json()
+      setAuthenticated(address, data.profile_id)
       toast.success('サインインしました')
       onAuthenticated?.(address)
     } catch (err) {
@@ -77,6 +68,14 @@ export function ConnectButton({ onAuthenticated }: ConnectButtonProps) {
           return (
             <Button onClick={openChainModal} variant="destructive">
               ネットワークを変更
+            </Button>
+          )
+        }
+
+        if (isChecking) {
+          return (
+            <Button variant="outline" disabled>
+              <Loader2 className="h-4 w-4 animate-spin" />
             </Button>
           )
         }

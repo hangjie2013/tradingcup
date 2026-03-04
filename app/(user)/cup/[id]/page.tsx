@@ -31,9 +31,10 @@ export default function CupDetailPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [cupRes, rankRes] = await Promise.all([
+        const [cupRes, rankRes, partRes] = await Promise.all([
           fetch(`/api/cups/${id}`),
           fetch(`/api/cups/${id}/ranking`),
+          fetch('/api/me/participations'),
         ])
         if (!cupRes.ok) { router.push('/'); return }
         const { data } = await cupRes.json()
@@ -41,6 +42,12 @@ export default function CupDetailPage() {
         if (rankRes.ok) {
           const { data: rankData } = await rankRes.json()
           setParticipants(rankData ?? [])
+        }
+        if (partRes.ok) {
+          const { data: cupIds } = await partRes.json()
+          if ((cupIds ?? []).includes(id)) {
+            setMyParticipation({ cup_id: id } as CupParticipant)
+          }
         }
       } catch {
         toast.error('大会情報の読み込みに失敗しました')
@@ -64,7 +71,7 @@ export default function CupDetailPage() {
   const isActive = cup.status === 'active'
   const isScheduled = cup.status === 'scheduled'
   const isEnded = cup.status === 'ended' || cup.status === 'finalized'
-  const canRegister = ['scheduled', 'active'].includes(cup.status) && !myParticipation
+  const canRegister = cup.status === 'scheduled' && !myParticipation
 
   const top10 = participants.slice(0, 10)
 
@@ -92,7 +99,7 @@ export default function CupDetailPage() {
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#171f52] via-[#1d2766] to-[#243189]">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0D0D1A] via-[#1E1B39] to-[#2D2D44]">
             <div className="absolute inset-0 flex items-center justify-center opacity-10">
               <Trophy className="h-64 w-64 text-white" />
             </div>
@@ -134,7 +141,7 @@ export default function CupDetailPage() {
             </span>
             <span className="flex items-center gap-1.5">
               <TrendingUp className="h-4 w-4" />
-              最小取引量 {cup.min_volume_usdt.toLocaleString()} USDT
+              最低取引量 {cup.min_volume_usdt.toLocaleString()} USDT
             </span>
             {cup.start_at && (
               <span className="flex items-center gap-1.5">
@@ -147,10 +154,14 @@ export default function CupDetailPage() {
           {/* CTA */}
           <div className="flex flex-wrap gap-3">
             {myParticipation ? (
-              <span className="inline-flex items-center gap-2 text-sm text-green-400">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary cursor-default"
+              >
                 <CheckCircle2 className="h-4 w-4" />
-                参加登録済み
-              </span>
+                参加済み
+              </Button>
             ) : canRegister ? (
               <Button size="lg" onClick={() => setShowRegister(true)}>
                 <Zap className="h-4 w-4 mr-2" />
@@ -186,7 +197,7 @@ export default function CupDetailPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { icon: Users, label: '参加者', value: `${cup.participant_count ?? 0}人` },
-              { icon: TrendingUp, label: '最小取引量', value: `${cup.min_volume_usdt.toLocaleString()} USDT` },
+              { icon: TrendingUp, label: '最低取引量', value: `${cup.min_volume_usdt.toLocaleString()} USDT` },
               {
                 icon: Calendar,
                 label: '開始',
@@ -198,7 +209,7 @@ export default function CupDetailPage() {
                 value: cup.end_at ? format(new Date(cup.end_at), 'M月d日 HH:mm', { locale: ja }) : '未定',
               },
             ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="bg-card border border-border rounded-xl px-4 py-3 shadow-[0px_4px_12px_0px_rgba(17,23,61,0.6)]">
+              <div key={label} className="bg-card border border-border rounded-xl px-4 py-3 shadow-[0px_4px_12px_0px_rgba(13,13,26,0.6)]">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
                   <Icon className="h-3.5 w-3.5" />
                   {label}
@@ -216,7 +227,7 @@ export default function CupDetailPage() {
               <Gift className="h-5 w-5 text-primary" />
               入賞報酬
             </h2>
-            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[0px_8px_24px_0px_rgba(17,23,61,0.8)]">
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[0px_8px_24px_0px_rgba(13,13,26,0.8)]">
               {cup.rewards.map((r, i) => (
                 <div
                   key={i}
@@ -238,7 +249,7 @@ export default function CupDetailPage() {
         {top10.length > 0 && (
           <section>
             <h2 className="text-lg font-bold mb-4 border-l-4 border-primary pl-3">現在の順位</h2>
-            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[0px_8px_24px_0px_rgba(17,23,61,0.8)]">
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[0px_8px_24px_0px_rgba(13,13,26,0.8)]">
               {top10.map((p, i) => {
                 const name = p.profiles?.display_name ?? shortenAddress(p.profiles?.wallet_address ?? '---')
                 const pnl = p.pnl_pct != null ? `${p.pnl_pct >= 0 ? '+' : ''}${p.pnl_pct.toFixed(2)}%` : '—'
@@ -275,16 +286,17 @@ export default function CupDetailPage() {
         {/* ルール */}
         <section>
           <h2 className="text-lg font-bold mb-4 border-l-4 border-primary pl-3">ルール</h2>
-          <div className="bg-card border border-border rounded-xl px-5 py-4 space-y-3 shadow-[0px_8px_24px_0px_rgba(17,23,61,0.8)]">
+          <div className="bg-card border border-border rounded-xl px-5 py-4 space-y-3 shadow-[0px_8px_24px_0px_rgba(13,13,26,0.8)]">
             {[
               `LBankでのIZKY/USDTの取引のみがカウントされます`,
               `大会期間中の入出金は即座に失格となります`,
+              `参加には最低 ${(cup.min_balance_usdt ?? 10).toLocaleString()} USDT の残高が必要です`,
               `賞品対象となるには ${cup.min_volume_usdt.toLocaleString()} USDT 以上の取引量が必要です`,
               `ランキングは開始時残高からのPNL%に基づきます`,
               `参加は大会開始時点で締め切ります`,
             ].map((rule, i) => (
               <div key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
-                <span className="text-primary font-bold mt-0.5 shrink-0">0{i + 1}</span>
+                <span className="text-primary font-bold mt-0.5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
                 <span>{rule}</span>
               </div>
             ))}
@@ -301,7 +313,7 @@ export default function CupDetailPage() {
               { step: '03', title: '参加登録', desc: 'この大会に参加登録を完了させる' },
               { step: '04', title: '取引開始', desc: '大会期間中にIZKY/USDTを取引して順位を上げる' },
             ].map(({ step, title, desc }) => (
-              <div key={step} className="bg-card border border-border rounded-xl p-4 shadow-[0px_4px_12px_0px_rgba(17,23,61,0.6)]">
+              <div key={step} className="bg-card border border-border rounded-xl p-4 shadow-[0px_4px_12px_0px_rgba(13,13,26,0.6)]">
                 <div className="text-2xl font-black text-primary/30 mb-2 leading-none">{step}</div>
                 <div className="text-sm font-semibold mb-1">{title}</div>
                 <div className="text-xs text-muted-foreground leading-relaxed">{desc}</div>
@@ -313,13 +325,14 @@ export default function CupDetailPage() {
         {/* Bottom CTA */}
         <section className="flex flex-wrap gap-3 pt-2 pb-4">
           {myParticipation ? (
-            <div className="flex-1 rounded-xl border border-green-500/30 bg-green-500/10 px-5 py-4 flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-green-400">参加登録済み</p>
-                <p className="text-xs text-muted-foreground">大会開始をお待ちください</p>
-              </div>
-            </div>
+            <Button
+              size="lg"
+              variant="outline"
+              className="flex-1 sm:flex-none gap-2 border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary cursor-default"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              参加済み
+            </Button>
           ) : canRegister ? (
             <Button size="lg" onClick={() => setShowRegister(true)} className="flex-1 sm:flex-none">
               <Zap className="h-4 w-4 mr-2" />
