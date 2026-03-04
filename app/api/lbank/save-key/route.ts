@@ -4,10 +4,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/crypto/encryption'
 import { getUserInfo } from '@/lib/lbank/api'
 import { exchangeApiKeyRepository } from '@/lib/repositories/exchange-api-key'
+import { getJwtSecret } from '@/lib/auth/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
-)
+const JWT_SECRET = getJwtSecret()
 
 export async function POST(request: NextRequest) {
   try {

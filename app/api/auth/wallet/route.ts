@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyMessage } from 'viem'
 import { createServiceClient } from '@/lib/supabase/server'
 import { SignJWT } from 'jose'
+import { getJwtSecret } from '@/lib/auth/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
-)
+const JWT_SECRET = getJwtSecret()
 
 export async function POST(request: NextRequest) {
   try {

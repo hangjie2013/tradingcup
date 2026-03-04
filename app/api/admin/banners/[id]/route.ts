@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { bannerRepository } from '@/lib/repositories/banner'
 import { storageRepository } from '@/lib/storage'
+import { requireAdmin } from '@/lib/auth/admin'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -10,10 +10,9 @@ const ALLOWED_PATCH_FIELDS = ['link_url', 'sort_order', 'is_active'] as const
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const adminCheck = await requireAdmin()
+    if (!adminCheck.authorized) {
+      return adminCheck.response
     }
 
     const body = await request.json()
@@ -42,10 +41,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const adminCheck = await requireAdmin()
+    if (!adminCheck.authorized) {
+      return adminCheck.response
     }
 
     await bannerRepository.delete(id)

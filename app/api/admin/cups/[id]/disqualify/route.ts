@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { cupParticipantRepository } from '@/lib/repositories/cup-participant'
 import { DisqualifyReason } from '@/types/database'
+import { requireAdmin } from '@/lib/auth/admin'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -9,14 +9,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { id: cupId } = await params
 
-    // Admin auth check
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Admin authorization check
+    const adminCheck = await requireAdmin()
+    if (!adminCheck.authorized) {
+      return adminCheck.response
     }
 
     const body = await request.json()

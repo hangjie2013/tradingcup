@@ -5,10 +5,9 @@ import { getTotalBalanceUSDT } from '@/lib/lbank/api'
 import { cupRepository } from '@/lib/repositories/cup'
 import { cupParticipantRepository } from '@/lib/repositories/cup-participant'
 import { exchangeApiKeyRepository } from '@/lib/repositories/exchange-api-key'
+import { getJwtSecret } from '@/lib/auth/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
-)
+const JWT_SECRET = getJwtSecret()
 
 type Params = { params: Promise<{ id: string }> }
 

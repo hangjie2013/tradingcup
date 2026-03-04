@@ -4,10 +4,9 @@ import {
   getUserInfo, getUSDTBalance, getAccountBalance, getAccountBalanceRaw,
   getTransactionHistoryRaw, getVolumeForPair, getTotalBalanceUSDT,
 } from '@/lib/lbank/api'
+import { getJwtSecret } from '@/lib/auth/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
-)
+const JWT_SECRET = getJwtSecret()
 
 export async function POST(request: NextRequest) {
   const sessionToken = request.cookies.get('wallet_session')?.value

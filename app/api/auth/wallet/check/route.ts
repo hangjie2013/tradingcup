@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getJwtSecret } from '@/lib/auth/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'fallback-secret'
-)
+const JWT_SECRET = getJwtSecret()
 
 export async function GET(request: NextRequest) {
   const sessionToken = request.cookies.get('wallet_session')?.value
