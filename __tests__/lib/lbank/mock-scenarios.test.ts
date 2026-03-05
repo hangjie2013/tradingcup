@@ -6,7 +6,7 @@ import {
   mockGetVolumeForPair,
   getScenarioData,
 } from '@/lib/lbank/mock'
-import { calculatePNL, calculateTotalBalance } from '@/lib/pnl'
+import { calculatePNL, calculateTotalBalance } from '@/lib/cup/pnl'
 
 // テスト用にシナリオを直接設定するヘルパー
 function setScenario(name: string) {
